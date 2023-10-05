@@ -2,10 +2,7 @@
 
 using namespace std;
 
-#define n 4
-#define m 3
-
-void printSolution(GRBModel &model, GRBVar X[n][n]) { // Print the edges of the generated graph
+void printSolution(GRBModel &model, GRBVar **X, int n) { // Print the edges of the generated graph
     if (model.get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
         cout << "No solution" << endl;
         return;
@@ -20,11 +17,26 @@ void printSolution(GRBModel &model, GRBVar X[n][n]) { // Print the edges of the 
     cout << endl;
 }
 
+void readInput(bool **&L_part, int *&L_values, int &n, int &m) {
+    cin >> n >> m;
+    L_part = new bool *[m];
+    L_values = new int[m];
+    int part_size, aux;
+    for (int i = 0; i < m; i++) {
+        L_part[i] = static_cast<bool *>(calloc(n, sizeof(bool)));
+        cin >> part_size >> L_values[i];
+        for (int j = 0; j < part_size; j++) {
+            cin >> aux;
+            L_part[i][aux] = true;
+        }
+    }
+}
+
 int main() {
-    bool L_part[m][n] = {{true,  false, false, false},
-                         {false, true,  false, false},
-                         {false, false, true,  false}}; // List of partitions
-    int L_values[m] = {2, 1, 1}; // List of cut sizes
+    int n, m;
+    bool **L_part;// List of partitions
+    int *L_values;// List of cut sizes
+    readInput(L_part, L_values, n, m);
 
     try {
         // Model
@@ -35,8 +47,9 @@ int main() {
 
         // Create boolean decision variables for the edges
         char name[100];
-        GRBVar X[n][n];
-        for (int i = 0; i < n; i++)
+        auto **X = new GRBVar *[n];
+        for (int i = 0; i < n; i++) {
+            X[i] = new GRBVar[n];
             for (int j = 0; j < n; j++) {
                 if (i > j)
                     X[i][j] = X[j][i]; // just copy the other matrix half
@@ -45,6 +58,7 @@ int main() {
                     X[i][j] = model.addVar(0.0, 1.0, 1.0, GRB_BINARY, name);
                 }
             }
+        }
 
         // Create the remaining edges per cut variables (used for the error minimizing version)
         /*GRBVar Y[m];
@@ -73,7 +87,7 @@ int main() {
         // Solve
         model.optimize();
         model.write("clrp.lp");
-        printSolution(model, X);
+        printSolution(model, X, n);
 
         delete env;
     } catch (GRBException e) {
